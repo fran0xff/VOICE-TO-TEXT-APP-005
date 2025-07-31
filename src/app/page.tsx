@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "../lib/hooks/useAuth";
-import { SignInWithGoogle } from "../../components/SignInWithGoogle";
-import { VoiceRecorder } from "../../components/VoiceRecorder";
-import { NotesList } from "../../components/NotesList";
-import { Header } from "../../components/Header";
-import { Footer } from "../../components/Footer";
+import { SignInWithGoogle } from "../components/SignInWithGoogle";
+import { VoiceRecorder } from "../components/VoiceRecorder";
+import { NotesList } from "../components/NotesList";
+import { Header } from "../components/Header";
+import { Footer } from "../components/Footer";
 
 export default function Home() {
   const { user, loading } = useAuth();
