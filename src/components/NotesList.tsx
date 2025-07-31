@@ -197,3 +197,173 @@ export function NotesList({ notes, onNotesUpdate }: NotesListProps) {
     </div>
   );
 } 
+"use client";
+
+import { useState, useEffect } from "react";
+import { useAuth } from "../lib/hooks/useAuth";
+import { getDocuments, updateDocument, deleteDocument } from "../lib/firebase/firebaseUtils";
+import { Edit2, Trash2, Save, X } from "lucide-react";
+
+interface Note {
+  id: string;
+  content: string;
+  timestamp: string;
+  createdAt: any;
+}
+
+interface NotesListProps {
+  notes: Note[];
+  onNotesUpdate: (notes: Note[]) => void;
+}
+
+export function NotesList({ notes, onNotesUpdate }: NotesListProps) {
+  const { user } = useAuth();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (user) {
+      loadNotes();
+    }
+  }, [user]);
+
+  const loadNotes = async () => {
+    if (!user) return;
+    
+    setLoading(true);
+    try {
+      const userNotes = await getDocuments("notes", [["userId", "==", user.uid]]);
+      const sortedNotes = userNotes.sort((a, b) => 
+        new Date(b.createdAt?.toDate?.() || b.createdAt).getTime() - 
+        new Date(a.createdAt?.toDate?.() || a.createdAt).getTime()
+      );
+      onNotesUpdate(sortedNotes);
+    } catch (error) {
+      console.error("Error loading notes:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const startEditing = (note: Note) => {
+    setEditingId(note.id);
+    setEditContent(note.content);
+  };
+
+  const cancelEditing = () => {
+    setEditingId(null);
+    setEditContent("");
+  };
+
+  const saveEdit = async (noteId: string) => {
+    if (!editContent.trim()) return;
+
+    try {
+      await updateDocument("notes", noteId, { 
+        content: editContent.trim(),
+        updatedAt: new Date()
+      });
+      
+      const updatedNotes = notes.map(note => 
+        note.id === noteId 
+          ? { ...note, content: editContent.trim() }
+          : note
+      );
+      onNotesUpdate(updatedNotes);
+      setEditingId(null);
+      setEditContent("");
+    } catch (error) {
+      console.error("Error updating note:", error);
+    }
+  };
+
+  const deleteNote = async (noteId: string) => {
+    if (!confirm("Are you sure you want to delete this note?")) return;
+
+    try {
+      await deleteDocument("notes", noteId);
+      const filteredNotes = notes.filter(note => note.id !== noteId);
+      onNotesUpdate(filteredNotes);
+    } catch (error) {
+      console.error("Error deleting note:", error);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="text-center py-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+        <p className="text-gray-600 mt-2">Loading notes...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white rounded-lg shadow-md p-6">
+      <h2 className="text-2xl font-semibold text-gray-800 mb-4">Your Notes</h2>
+      
+      {notes.length === 0 ? (
+        <div className="text-center py-8">
+          <p className="text-gray-600">No notes yet. Start recording to create your first note!</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {notes.map((note) => (
+            <div key={note.id} className="border border-gray-200 rounded-lg p-4">
+              <div className="flex justify-between items-start mb-2">
+                <span className="text-sm text-gray-500">
+                  {new Date(note.timestamp).toLocaleString()}
+                </span>
+                <div className="flex space-x-2">
+                  {editingId === note.id ? (
+                    <>
+                      <button
+                        onClick={() => saveEdit(note.id)}
+                        className="text-green-600 hover:text-green-800"
+                      >
+                        <Save className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={cancelEditing}
+                        className="text-gray-600 hover:text-gray-800"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => startEditing(note)}
+                        className="text-blue-600 hover:text-blue-800"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => deleteNote(note.id)}
+                        className="text-red-600 hover:text-red-800"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+              
+              {editingId === note.id ? (
+                <textarea
+                  value={editContent}
+                  onChange={(e) => setEditContent(e.target.value)}
+                  className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  rows={4}
+                />
+              ) : (
+                <p className="text-gray-700 whitespace-pre-wrap">{note.content}</p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
